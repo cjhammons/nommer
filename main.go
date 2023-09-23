@@ -2,14 +2,12 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
-	"./routes/project"
-	"github.com/cjhammons/nommer/routes/project"
+	"github.com/cjhammons/nommer/routes"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
@@ -23,6 +21,7 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
+	log.Println("Connecting to mongoDB")
 	// Read environment variables
 	mongoURI := os.Getenv("MONGO_URI")
 	mongoDatabase := os.Getenv("MONGO_DATABASE")
@@ -41,17 +40,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Connected to MongoDB!")
+	log.Println("Connected to MongoDB:" + mongoURI + mongoDatabase)
 	// Create or get a collection
 	collection := client.Database(mongoDatabase).Collection("project-events")
 
 	router := mux.NewRouter()
 
-	router.HandleFunc("/1/projects", &project.CreateProjectHandler(collection)).Methods("POST")
-	router.HandleFunc("/1/projects/{projectname}/events", &project.CreateEventHandler(collection)).Methods("POST")
+	router.HandleFunc("/1/projects", routes.CreateProjectHandler(collection)).Methods("POST")
+	router.HandleFunc("/1/{project_name}/event", routes.SendProjectEventHandler(collection)).Methods("POST")
 
 	// Wrap router with Gorilla Handlers for additional functionality like Logging
-	loggingRouter := handlers.LoggingHandler(http.Stdout, router)
+	loggingRouter := handlers.LoggingHandler(os.Stdout, router)
 
 	// Start server
 	srv := &http.Server{
@@ -60,6 +59,7 @@ func main() {
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
+	log.Println("Starting server on port 8080")
 
 	log.Fatal(srv.ListenAndServe())
 }

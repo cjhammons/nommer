@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"math/big"
 	"time"
 
@@ -18,15 +19,15 @@ import (
 )
 
 type Project struct {
-	ID     string  `json:"id" bson:"_id,omitempty"`
+	ID     string  `json:"_id" bson:"_id,omitempty"`
 	Name   string  `json:"name" bson:"name"`
 	APIKey string  `json:"apikey" bson:"apikey"`
 	Events []Event `json:"events" bson:"events"`
 }
 
 type Event struct {
-	TimeStamp time.Time              `json:"type" bson:"type"`
-	Data      map[string]interface{} `json:"data" bson:"data"`
+	TimeStamp time.Time              `json:"timestamp" bson:"timestamp"`
+	Data      map[string]interface{} `json:"Event" bson:"Event"`
 }
 
 // CreateProjectHandler creates a new project and assigns an API key
@@ -50,6 +51,7 @@ func CreateProjectHandler(collection *mongo.Collection) http.HandlerFunc {
 
 		// Check if project name already exists
 		var existingProject Project
+		log.Println("Checking if project {name} already exists", projectName)
 		err := collection.FindOne(ctx, bson.M{"name": projectName}).Decode(&existingProject)
 		if err == nil {
 			http.Error(w, "Project name already exists", http.StatusConflict)
@@ -57,19 +59,18 @@ func CreateProjectHandler(collection *mongo.Collection) http.HandlerFunc {
 		}
 
 		// Create a Project object
-		var p Project
-		p.Name = projectName
-
-		// Generate an API key for the project
-		p.APIKey = GenerateAPIKey(projectName)
-
+		p := Project{
+			Name:   projectName,
+			APIKey: GenerateAPIKey(projectName),
+			Events: []Event{},
+		}
 		// Insert the project into the database
 		_, err = collection.InsertOne(ctx, p)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
+		log.Println("Created project {name}", projectName)
 		// Return the created project, including the API key
 		json.NewEncoder(w).Encode(p)
 	}
@@ -81,7 +82,7 @@ func SendProjectEventHandler(collection *mongo.Collection) http.HandlerFunc {
 		defer cancel()
 
 		vars := mux.Vars(r)
-		projectName := vars["projectName"]
+		projectName := vars["project_name"]
 
 		// Retrieve API key from request header
 		apiKey := r.Header.Get("X-API-Key")
@@ -133,7 +134,11 @@ func SendProjectEventHandler(collection *mongo.Collection) http.HandlerFunc {
 
 func GenerateAPIKey(projectName string) string {
 	max := big.NewInt(1<<31 - 1)
-	data := fmt.Sprintf("%s-%d-%d", projectName, time.Now().UnixNano(), rand.Int(rand.Reader, max))
+	n, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		log.Fatal(err)
+	}
+	data := fmt.Sprintf("%s-%d-%d", projectName, time.Now().UnixNano(), n)
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:])
 }
