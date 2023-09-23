@@ -32,6 +32,9 @@ type Event struct {
 // CreateProjectHandler creates a new project and assigns an API key
 func CreateProjectHandler(collection *mongo.Collection) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
 		var payload map[string]string
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -47,7 +50,7 @@ func CreateProjectHandler(collection *mongo.Collection) http.HandlerFunc {
 
 		// Check if project name already exists
 		var existingProject Project
-		err := collection.FindOne(context.TODO(), bson.M{"name": projectName}).Decode(&existingProject)
+		err := collection.FindOne(ctx, bson.M{"name": projectName}).Decode(&existingProject)
 		if err == nil {
 			http.Error(w, "Project name already exists", http.StatusConflict)
 			return
@@ -61,7 +64,7 @@ func CreateProjectHandler(collection *mongo.Collection) http.HandlerFunc {
 		p.APIKey = GenerateAPIKey(projectName)
 
 		// Insert the project into the database
-		_, err = collection.InsertOne(context.TODO(), p)
+		_, err = collection.InsertOne(ctx, p)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -74,6 +77,9 @@ func CreateProjectHandler(collection *mongo.Collection) http.HandlerFunc {
 
 func SendProjectEventHandler(collection *mongo.Collection) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
 		vars := mux.Vars(r)
 		projectName := vars["projectName"]
 
@@ -82,7 +88,7 @@ func SendProjectEventHandler(collection *mongo.Collection) http.HandlerFunc {
 
 		// Find project by name and validate API key
 		var foundProject Project
-		err := collection.FindOne(context.TODO(), bson.M{"name": projectName}).Decode(&foundProject)
+		err := collection.FindOne(ctx, bson.M{"name": projectName}).Decode(&foundProject)
 		if err != nil {
 			http.Error(w, "Project not found", http.StatusNotFound)
 			return
@@ -114,7 +120,7 @@ func SendProjectEventHandler(collection *mongo.Collection) http.HandlerFunc {
 
 		// Push the event into MongoDB
 		update := bson.D{{"$push", bson.D{{"events", e}}}}
-		_, err = collection.UpdateOne(context.TODO(), bson.M{"name": projectName}, update)
+		_, err = collection.UpdateOne(ctx, bson.M{"name": projectName}, update)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
