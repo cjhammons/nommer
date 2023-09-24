@@ -47,6 +47,7 @@ func main() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/1/projects", routes.CreateProjectHandler(collection)).Methods("POST")
+	router.HandleFunc("/1/projects", routes.GetProjectsHandler(collection)).Methods("GET")
 	router.HandleFunc("/1/{project_name}/event", routes.SendProjectEventHandler(collection)).Methods("POST")
 
 	// Wrap router with Gorilla Handlers for additional functionality like Logging

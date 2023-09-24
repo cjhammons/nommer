@@ -132,6 +132,46 @@ func SendProjectEventHandler(collection *mongo.Collection) http.HandlerFunc {
 	}
 }
 
+func GetProjectsHandler(collection *mongo.Collection) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		log.Println("Getting list of all projects")
+		var projects []Project
+
+		log.Println("Connecting to mongoDB")
+		cursor, err := collection.Find(ctx, bson.M{})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(ctx)
+
+		for cursor.Next(ctx) {
+			var project Project
+			cursor.Decode(&project)
+			projects = append(projects, project['name'])
+		}
+
+		if err := cursor.Err(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		json.NewEncoder(w).Encode(projects)
+	}
+}
+
+func GetProjectEventsHandler(collection *mongo.Collection) http.HandleFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+
+		//todo
+
+	}
+}
+
 func GenerateAPIKey(projectName string) string {
 	max := big.NewInt(1<<31 - 1)
 	n, err := rand.Int(rand.Reader, max)
