@@ -51,7 +51,7 @@ func CreateProjectHandler(collection *mongo.Collection) http.HandlerFunc {
 
 		// Check if project name already exists
 		var existingProject Project
-		log.Println("Checking if project {name} already exists", projectName)
+		log.Printf("Checking if project %s already exists", projectName)
 		err := collection.FindOne(ctx, bson.M{"name": projectName}).Decode(&existingProject)
 		if err == nil {
 			http.Error(w, "Project name already exists", http.StatusConflict)
@@ -70,7 +70,7 @@ func CreateProjectHandler(collection *mongo.Collection) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		log.Println("Created project {name}", projectName)
+		log.Printf("Created project %s", projectName)
 		// Return the created project, including the API key
 		json.NewEncoder(w).Encode(p)
 	}
@@ -126,7 +126,7 @@ func SendProjectEventHandler(collection *mongo.Collection) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
+		log.Printf("Successfully pushed event for project %s", projectName)
 		// Return the created event
 		json.NewEncoder(w).Encode(e)
 	}
