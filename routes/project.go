@@ -137,7 +137,7 @@ func GetProjectsHandler(collection *mongo.Collection) http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		log.Println("Getting list of all projects")
-		var projects []Project
+		var projects []map[string]string
 
 		log.Println("Connecting to mongoDB")
 		cursor, err := collection.Find(ctx, bson.M{})
@@ -150,14 +150,18 @@ func GetProjectsHandler(collection *mongo.Collection) http.HandlerFunc {
 		for cursor.Next(ctx) {
 			var project Project
 			cursor.Decode(&project)
-			projects = append(projects, project['name'])
+			projects = append(projects, map[string]string{
+				"project_id":   project.ID,
+				"project_name": project.Name,
+			})
 		}
 
 		if err := cursor.Err(); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
+		log.Printf("Found %d projects", len(projects))
+		log.Println(projects)
 		json.NewEncoder(w).Encode(projects)
 	}
 }
