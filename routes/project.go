@@ -166,13 +166,46 @@ func GetProjectsHandler(collection *mongo.Collection) http.HandlerFunc {
 	}
 }
 
-func GetProjectEventsHandler(collection *mongo.Collection) http.HandleFunc {
+func GetProjectEventsHandler(collection *mongo.Collection) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
+		vars := mux.Vars(r)
+		projectName := vars["project_name"]
+		log.Printf("Getting list of all events for %s", projectName)
 
-		//todo
+		var events []Event
+		log.Println("Connecting to mongoDB")
+		cursor, err := collection.Find(ctx, bson.M{})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(ctx)
 
+		// Retrieve API key from request header
+		apiKey := r.Header.Get("X-API-Key")
+		var foundProject Project
+		err = collection.FindOne(ctx, bson.M{"name": projectName}).Decode(&foundProject)
+		if err != nil {
+			http.Error(w, "Project not found", http.StatusNotFound)
+			return
+		}
+		if foundProject.APIKey != apiKey {
+			http.Error(w, "Invalid API key", http.StatusUnauthorized)
+			return
+		}
+
+		for cursor.Next(ctx) {
+			var project Project
+			cursor.Decode(&project)
+			if project.Name == projectName && project.APIKey == apiKey {
+				events = project.Events
+				break
+			}
+		}
+		log.Printf("Found %d events", len(events))
+		json.NewEncoder(w).Encode(events)
 	}
 }
 
