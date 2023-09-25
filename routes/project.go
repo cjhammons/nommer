@@ -132,6 +132,83 @@ func SendProjectEventHandler(collection *mongo.Collection) http.HandlerFunc {
 	}
 }
 
+func GetProjectsHandler(collection *mongo.Collection) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		log.Println("Getting list of all projects")
+		var projects []map[string]string
+
+		log.Println("Connecting to mongoDB")
+		cursor, err := collection.Find(ctx, bson.M{})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(ctx)
+
+		for cursor.Next(ctx) {
+			var project Project
+			cursor.Decode(&project)
+			projects = append(projects, map[string]string{
+				"project_id":   project.ID,
+				"project_name": project.Name,
+			})
+		}
+
+		if err := cursor.Err(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Printf("Found %d projects", len(projects))
+		log.Println(projects)
+		json.NewEncoder(w).Encode(projects)
+	}
+}
+
+func GetProjectEventsHandler(collection *mongo.Collection) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		vars := mux.Vars(r)
+		projectName := vars["project_name"]
+		log.Printf("Getting list of all events for %s", projectName)
+
+		var events []Event
+		log.Println("Connecting to mongoDB")
+		cursor, err := collection.Find(ctx, bson.M{})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(ctx)
+
+		// Retrieve API key from request header
+		apiKey := r.Header.Get("X-API-Key")
+		var foundProject Project
+		err = collection.FindOne(ctx, bson.M{"name": projectName}).Decode(&foundProject)
+		if err != nil {
+			http.Error(w, "Project not found", http.StatusNotFound)
+			return
+		}
+		if foundProject.APIKey != apiKey {
+			http.Error(w, "Invalid API key", http.StatusUnauthorized)
+			return
+		}
+
+		for cursor.Next(ctx) {
+			var project Project
+			cursor.Decode(&project)
+			if project.Name == projectName && project.APIKey == apiKey {
+				events = project.Events
+				break
+			}
+		}
+		log.Printf("Found %d events", len(events))
+		json.NewEncoder(w).Encode(events)
+	}
+}
+
 func GenerateAPIKey(projectName string) string {
 	max := big.NewInt(1<<31 - 1)
 	n, err := rand.Int(rand.Reader, max)
