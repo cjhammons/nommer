@@ -48,6 +48,30 @@ curl -X POST "http://localhost:8080/1/test_project/event" \
      -d '{"event": {"key1": "value1", "key2": "value2"}}'
 ```
 
+### GET /1/projects
+
+Retrieves a list of all projects.
+
+Example:
+
+```bash
+curl -X GET "http://localhost:8080/1/projects"
+```
+This will return a JSON array with the project details like project_id and project_name.
+
+### GET /1/{project_name}/event
+
+Retrieves a list of all events for a specific project. Requires an API key in the header for authorization.
+
+Example:
+
+```bash
+curl -X GET "http://localhost:8080/1/test_project/event" \
+     -H "X-API-Key: your_actual_api_key_here"
+```
+This will return a JSON array containing all the events for the specified project.
+
+
 # Data Structure in MongoDB
 
 Here is an example of how a project with a single event will appear in MongoDB:
